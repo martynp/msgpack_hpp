@@ -182,6 +182,18 @@ public:
         m_uint64 = value;
     }
 
+    MsgPackObj(float value)
+    {
+        type = MsgpackType::FLOAT32;
+        m_float32 = value;
+    }
+
+    MsgPackObj(double value)
+    {
+        type = MsgpackType::FLOAT64;
+        m_float64 = value;
+    }
+
     MsgPackObj(std::string value)
     {
         type = MsgpackType::STR;
@@ -219,23 +231,37 @@ public:
         switch (type)
         {
         case MsgpackType::POSITIVE_FIXINT:
-            std::cout << "POSITIVE_FIXINT(" << (long long int)m_int8 << ")";
+            std::cout << "POSITIVE_FIXINT(" << (uint16_t)m_int8 << ")";
             break;
         case MsgpackType::INT8:
-            std::cout << "INT8(" << (long long int)m_int8 << ")";
+            std::cout << "INT8(" << (uint16_t)m_int8 << ")";
             break;
         case MsgpackType::INT16:
-            std::cout << "INT16(" << (long long int)m_int16 << ")";
+            std::cout << "INT16(" << m_int16 << ")";
             break;
         case MsgpackType::INT32:
+            std::cout << "INT32(" << m_int32 << ")";
+            break;
         case MsgpackType::INT64:
+            std::cout << "INT64(" << m_int64 << ")";
+            break;
         case MsgpackType::UINT8:
+            std::cout << "UINT8(" << (uint16_t)m_uint8 << ")";
+            break;
         case MsgpackType::UINT16:
             std::cout << "UINT16(" << m_uint16 << ")";
             break;
         case MsgpackType::UINT32:
+            std::cout << "UINT32(" << m_uint32 << ")";
+            break;
         case MsgpackType::UINT64:
-            std::cout << "UINT(" << m_str << ")";
+            std::cout << "UINT64(" << m_uint64 << ")";
+            break;
+        case MsgpackType::FLOAT32:
+            std::cout << "FLOAT32(" << m_float32 << ")";
+            break;
+        case MsgpackType::FLOAT64:
+            std::cout << "FLOAT64(" << m_float64 << ")";
             break;
         case MsgpackType::BIN:
             std::cout << "BIN(";
@@ -296,9 +322,6 @@ public:
         size_t current = 0;
         while (current < raw.size())
         {
-
-            std::cout << "Processing: " << std::hex << (int)raw[current] << std::dec << " (" << (int)current << ")" << std::endl;
-
             if ((uint8_t)raw[current] <= 0x7f)
             {
                 objects.push_back(std::make_shared<MsgPackObj>((uint8_t)raw[current], true));
@@ -341,7 +364,60 @@ public:
                 objects.push_back(std::make_shared<MsgPackObj>(value));
                 current += 2 + size;
             }
+            else if (raw[current] == 0xca) // FLOAT
+            {
+                check_size(current, 4, raw.size());
 
+                float value;
+                uint8_t *v_ptr = (uint8_t *)&value;
+                if (m_little_endian)
+                {
+                    *(v_ptr) = raw[current + 4];
+                    *(v_ptr + 1) = raw[current + 3];
+                    *(v_ptr + 2) = raw[current + 2];
+                    *(v_ptr + 3) = raw[current + 1];
+                }
+                else
+                {
+                    *(v_ptr) = raw[current + 1];
+                    *(v_ptr + 1) = raw[current + 2];
+                    *(v_ptr + 2) = raw[current + 3];
+                    *(v_ptr + 3) = raw[current + 4];
+                }
+                objects.push_back(std::make_shared<MsgPackObj>(value));
+                current += 5;
+            }
+            else if (raw[current] == 0xcb) // DOUBLE
+            {
+                check_size(current, 8, raw.size());
+
+                double value;
+                uint8_t *v_ptr = (uint8_t *)&value;
+                if (m_little_endian)
+                {
+                    *(v_ptr) = raw[current + 8];
+                    *(v_ptr + 1) = raw[current + 7];
+                    *(v_ptr + 2) = raw[current + 6];
+                    *(v_ptr + 3) = raw[current + 5];
+                    *(v_ptr + 4) = raw[current + 4];
+                    *(v_ptr + 5) = raw[current + 3];
+                    *(v_ptr + 6) = raw[current + 2];
+                    *(v_ptr + 7) = raw[current + 1];
+                }
+                else
+                {
+                    *(v_ptr) = raw[current + 1];
+                    *(v_ptr + 1) = raw[current + 2];
+                    *(v_ptr + 2) = raw[current + 3];
+                    *(v_ptr + 3) = raw[current + 4];
+                    *(v_ptr + 4) = raw[current + 5];
+                    *(v_ptr + 5) = raw[current + 6];
+                    *(v_ptr + 6) = raw[current + 7];
+                    *(v_ptr + 7) = raw[current + 8];
+                }
+                objects.push_back(std::make_shared<MsgPackObj>(value));
+                current += 9;
+            }
             else if (raw[current] == 0xcc) // UINT8
             {
                 if (current + 1 >= raw.size())
@@ -435,7 +511,6 @@ public:
 
             else if (raw[current] == 0xd0) // INT8
             {
-                std::cout << "here" << std::endl;
                 check_size(current, 1, raw.size());
                 objects.push_back(std::make_shared<MsgPackObj>((int8_t)raw[current + 1], false));
                 current += 2;
