@@ -65,11 +65,49 @@ public:
         case MsgpackType::INT8:
             return m_int8;
             break;
+        case MsgpackType::UINT8:
+            return m_uint8;
+            break;
         case MsgpackType::INT16:
             return m_int16;
             break;
         case MsgpackType::INT32:
             return m_int32;
+            break;
+        default:
+            return 0;
+            break;
+        }
+    }
+
+    int32_t as_int64()
+    {
+        switch (type)
+        {
+        case MsgpackType::POSITIVE_FIXINT:
+        case MsgpackType::INT8:
+            return m_int8;
+            break;
+        case MsgpackType::UINT8:
+            return m_uint8;
+            break;
+        case MsgpackType::INT16:
+            return m_int16;
+            break;
+        case MsgpackType::UINT16:
+            return m_uint16;
+            break;
+        case MsgpackType::INT32:
+            return m_int32;
+            break;
+        case MsgpackType::UINT32:
+            return m_uint32;
+            break;
+        case MsgpackType::INT64:
+            return m_int64;
+            break;
+        case MsgpackType::UINT64:
+            return m_uint64;
             break;
         default:
             return 0;
