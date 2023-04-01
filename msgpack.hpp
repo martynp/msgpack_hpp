@@ -11,6 +11,7 @@
 typedef enum e_MsgpackType
 {
     POSITIVE_FIXINT,
+    NEGATIVE_FIXINT,
     NIL,
     BOOL,
     BIN,
@@ -42,8 +43,10 @@ public:
     bool is_bool() {}
     bool is_bin() {}
     bool is_ext() {}
-    bool is_float32() {}
-    bool is_float64() {}
+    */
+    bool is_float32() { return type == MsgpackType::FLOAT32; }
+    bool is_float64() { return type == MsgpackType::FLOAT64; }
+    /*
     bool is_uint8() {}
     bool is_uint16() {}
     bool is_uint32() {}
@@ -57,11 +60,25 @@ public:
     bool is_map() { return type == MsgpackType::MAP; }
     bool is_str_map() { return type == MsgpackType::MAP; }
 
+    bool is_unsigned() { return type == MsgpackType::UINT16 || type == MsgpackType::UINT32 || type == MsgpackType::UINT64 || type == MsgpackType::UINT8; }
+    bool is_signed() { return !is_unsigned(); }
+
     int32_t as_int32()
+    {
+        return as_int64();
+    }
+
+    int32_t as_uint32()
+    {
+        return as_uint64();
+    }
+
+    int64_t as_int64()
     {
         switch (type)
         {
         case MsgpackType::POSITIVE_FIXINT:
+        case MsgpackType::NEGATIVE_FIXINT:
         case MsgpackType::INT8:
             return m_int8;
             break;
@@ -71,8 +88,20 @@ public:
         case MsgpackType::INT16:
             return m_int16;
             break;
+        case MsgpackType::UINT16:
+            return m_uint16;
+            break;
         case MsgpackType::INT32:
             return m_int32;
+            break;
+        case MsgpackType::UINT32:
+            return m_uint32;
+            break;
+        case MsgpackType::INT64:
+            return m_int64;
+            break;
+        case MsgpackType::UINT64:
+            return m_uint64;
             break;
         default:
             return 0;
@@ -80,11 +109,12 @@ public:
         }
     }
 
-    int32_t as_int64()
+    uint64_t as_uint64()
     {
         switch (type)
         {
         case MsgpackType::POSITIVE_FIXINT:
+        case MsgpackType::NEGATIVE_FIXINT:
         case MsgpackType::INT8:
             return m_int8;
             break;
@@ -164,12 +194,17 @@ public:
         m_bool = value;
     }
 
-    MsgPackObj(int8_t value, bool fixed)
+    MsgPackObj(int8_t value, bool fixed_positive, bool fixed_negative)
     {
-        if (fixed)
+        if (fixed_positive)
         {
             type = MsgpackType::POSITIVE_FIXINT;
             m_int8 = value & 0x7f; // Enforce 7 bit size
+        }
+        else if (fixed_negative)
+        {
+            type = MsgpackType::NEGATIVE_FIXINT;
+            m_int8 = value | 0xE0; // Enforce first three bits as 1's
         }
         else
         {
@@ -362,7 +397,7 @@ public:
         {
             if ((uint8_t)raw[current] <= 0x7f)
             {
-                objects.push_back(std::make_shared<MsgPackObj>((uint8_t)raw[current], true));
+                objects.push_back(std::make_shared<MsgPackObj>((uint8_t)raw[current], true, false));
                 current += 1;
             }
             else if (raw[current] == 0xc0) // NIL
@@ -550,7 +585,7 @@ public:
             else if (raw[current] == 0xd0) // INT8
             {
                 check_size(current, 1, raw.size());
-                objects.push_back(std::make_shared<MsgPackObj>((int8_t)raw[current + 1], false));
+                objects.push_back(std::make_shared<MsgPackObj>((int8_t)raw[current + 1], false, false));
                 current += 2;
             }
             else if (raw[current] == 0xd1) // INT16
@@ -692,6 +727,11 @@ public:
                 objects.push_back(std::make_shared<MsgPackObj>(pairs));
                 current += 1 + consumed;
             }
+            else if (raw[current] >= 0xe0 || raw[current] <= 0xff) // NEGATIVE FIXINT
+            {
+                objects.push_back(std::make_shared<MsgPackObj>((int8_t)raw[current], false, true));
+                current += 1;
+            }
             else
             {
                 std::cout << "Unknown: " << std::hex << (int)raw[current] << std::endl;
@@ -704,10 +744,12 @@ public:
 
         consumed = current;
 
+        /*
         for (size_t i = 0; i < objects.size(); i++)
         {
             objects[i]->print(true);
         }
+        */
     }
 
     ~MsgPack()

@@ -24,16 +24,20 @@ enum DataType
 
 typedef struct
 {
+    std::string name;
     DataType type;
     std::vector<uint8_t> data;
     bool bool_value;
     int64_t number_value;
+    double number_value_float;
 } test_data_t;
 
 std::vector<test_data_t> extract_tests();
 
-void print_vec(std::vector<uint8_t> &data) {
-    for (auto &e : data) {
+void print_vec(std::vector<uint8_t> &data)
+{
+    for (auto &e : data)
+    {
         std::cout << std::hex << (uint16_t)e << " ";
     }
     std::cout << std::endl;
@@ -54,8 +58,22 @@ TEST_CASE("Test Vectors")
             break;
         case DataTypeNumber:
             reader = new MsgPack(t.data);
-            print_vec(t.data);
-            REQUIRE(reader->objects[0]->as_int64() == t.number_value);
+            if (reader->objects[0]->is_float32())
+            {
+                REQUIRE(reader->objects[0]->m_float32 == t.number_value_float);
+            }
+            else if (reader->objects[0]->is_float64())
+            {
+                REQUIRE(reader->objects[0]->m_float64 == t.number_value_float);
+            }
+            else if (reader->objects[0]->is_signed())
+            {
+                REQUIRE(reader->objects[0]->as_int64() == t.number_value);
+            }
+            else if (reader->objects[0]->is_unsigned())
+            {
+                REQUIRE(reader->objects[0]->as_uint64() == t.number_value);
+            }
             break;
         default:
             break;
@@ -127,8 +145,13 @@ std::vector<test_data_t> extract_tests()
     for (auto test = ++beg; test != end; ++test)
     {
         // std::cout << test->key() << ":" << test->type_name() << " -> " << test->value() << std::endl;
+        // std::cout << "Processing " << test->key() << std::endl;
 
-        std::cout << "Processing " << test->key() << std::endl;
+        // Get just this element
+        char buffer[1024];
+        std::stringstream ss(test->key().data());
+        ss.get((char *)&buffer, test->key().size() + 1); // +1 for reasons
+        std::string name = buffer;
 
         fjson subjson = json.at(test);
         auto subtest = subjson.begin();
@@ -144,6 +167,7 @@ std::vector<test_data_t> extract_tests()
             DataType type = DataTypeNull;
             bool bool_value = false;
             int64_t number_value = -123456;
+            double number_value_float = 0.12345;
 
             for (++oit; oit != oend; ++oit)
             {
@@ -165,7 +189,8 @@ std::vector<test_data_t> extract_tests()
                 {
                     type = DataTypeNumber;
                     number_value = std::strtoul(oit->value().data(), nullptr, 10);
-                    //std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
+                    number_value_float = std::strtod(oit->value().data(), nullptr);
+                    // std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
                 }
                 else if (oit->key() == "timestamp")
                 {
@@ -204,7 +229,7 @@ std::vector<test_data_t> extract_tests()
                     auto arrayjson_end = arrayjson.end();
                     for (++arrayjson_element; arrayjson_element != arrayjson_end; ++arrayjson_element)
                     {
-                        std::cout << "  " << arrayjson_element->type_name() << " -> " << arrayjson_element->value() << std::endl;
+                        //std::cout << "  " << arrayjson_element->type_name() << " -> " << arrayjson_element->value() << std::endl;
 
                         // For some reason this ss includes all remaining data in the array
                         std::stringstream ss(arrayjson_element->value().data());
@@ -224,8 +249,12 @@ std::vector<test_data_t> extract_tests()
                             bytes.push_back(std::strtoul(tmp.c_str(), nullptr, 16));
                         }
 
-                        tests.push_back({type, bytes, bool_value, number_value});
+                        tests.push_back({name, type, bytes, bool_value, number_value, number_value_float});
                     }
+                }
+                else if (oit->key() == "bignum")
+                {
+                    // pass
                 }
                 else
                 {
