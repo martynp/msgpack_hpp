@@ -35,28 +35,22 @@ class MsgPackObj
 {
 
 public:
-    /*bool is_positive_fixedint() {}
-    bool is_fixmap() {}
-    bool is_fixarray() {}
-    bool if_fixstr() {}
-    bool is_nil() {}
-    bool is_bool() {}
-    bool is_bin() {}
-    bool is_ext() {}
-    */
+    bool is_nil() { return type == MsgpackType::NIL; }
+    bool is_bool() { return type == MsgpackType::BOOL; }
+    bool is_bin() { return type == MsgpackType::BIN; }
+    bool is_ext() { return type == MsgpackType::EXT; }
     bool is_float32() { return type == MsgpackType::FLOAT32; }
     bool is_float64() { return type == MsgpackType::FLOAT64; }
-    /*
-    bool is_uint8() {}
-    bool is_uint16() {}
-    bool is_uint32() {}
-    bool is_uint64() {}
-    bool is_int8() {}
-    bool is_int16() {}*/
-    bool is_int32() { return type == MsgpackType::POSITIVE_FIXINT || type == MsgpackType::INT8 || type == MsgpackType::INT16 || type == MsgpackType::INT32; }
-    /*bool is_int64() {}*/
+    bool is_uint8() { return type == MsgpackType::UINT8 || type == MsgpackType::POSITIVE_FIXINT; }
+    bool is_uint16() { return type == MsgpackType::UINT16; }
+    bool is_uint32() { return type == MsgpackType::UINT32; }
+    bool is_uint64() { return type == MsgpackType::UINT64; }
+    bool is_int8() { return type == MsgpackType::INT8 || type == MsgpackType::POSITIVE_FIXINT || type == MsgpackType::NEGATIVE_FIXINT; }
+    bool is_int16() { return type == MsgpackType::INT16; }
+    bool is_int32() { return type == MsgpackType::INT32; }
+    bool is_int64() { return type == MsgpackType::INT64; }
     bool is_str() { return type == MsgpackType::STR; }
-    /*bool is_array() {}*/
+    bool is_array() { return type == MsgpackType::ARRAY; }
     bool is_map() { return type == MsgpackType::MAP; }
     bool is_str_map() { return type == MsgpackType::MAP; }
 
@@ -199,7 +193,8 @@ public:
         if (fixed_positive)
         {
             type = MsgpackType::POSITIVE_FIXINT;
-            m_int8 = value & 0x7f; // Enforce 7 bit size
+            m_int8 = value & 0x7f;  // Enforce 7 bit size
+            m_uint8 = value & 0x7f; // Both are valid
         }
         else if (fixed_negative)
         {
@@ -400,6 +395,7 @@ public:
                 objects.push_back(std::make_shared<MsgPackObj>((uint8_t)raw[current], true, false));
                 current += 1;
             }
+
             else if (raw[current] == 0xc0) // NIL
             {
                 objects.push_back(std::make_shared<MsgPackObj>());
@@ -666,6 +662,7 @@ public:
 
             else if ((raw[current] & 0xE0) == 0xA0) // Fixed string
             {
+
                 uint8_t size = raw[current] & 0x1F;
                 if (current + size >= raw.size())
                 {
@@ -698,6 +695,46 @@ public:
                     value += (char)raw[index];
                 objects.push_back(std::make_shared<MsgPackObj>(value));
                 current += 2 + size;
+            }
+            else if (raw[current] == 0xda) // STR16
+            {
+                if (current + 2 >= raw.size())
+                {
+                    // Exception
+                }
+                uint16_t size = (((uint16_t)raw[current + 1]) << 8) | (uint16_t)raw[current + 2];
+
+                if (current + 2 + size >= raw.size())
+                {
+                    // Exception
+                }
+                std::string value;
+                value.reserve(size);
+
+                for (size_t index = current + 3; index <= current + 2 + size; index++)
+                    value += (char)raw[index];
+                objects.push_back(std::make_shared<MsgPackObj>(value));
+                current += 3 + size;
+            }
+            else if (raw[current] == 0xdb) // STR32
+            {
+                if (current + 4 >= raw.size())
+                {
+                    // Exception
+                }
+                uint32_t size = (((uint32_t)raw[current + 1]) << 24) | (((uint32_t)raw[current + 2]) << 16) | (((uint32_t)raw[current + 3]) << 8) | (uint32_t)raw[current + 4];
+
+                if (current + 4 + size >= raw.size())
+                {
+                    // Exception
+                }
+                std::string value;
+                value.reserve(size);
+
+                for (size_t index = current + 5; index <= current + 4 + size; index++)
+                    value += (char)raw[index];
+                objects.push_back(std::make_shared<MsgPackObj>(value));
+                current += 5 + size;
             }
             else if ((raw[current] & 0xF0) == 0x80) // FIXMAP
             {
@@ -769,7 +806,7 @@ public:
 
         if (!objects[0]->is_str_map())
         {
-            // Excaption
+            // Exception
         }
 
         return objects[0]->as_str_map();

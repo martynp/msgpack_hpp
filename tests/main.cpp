@@ -29,7 +29,9 @@ typedef struct
     std::vector<uint8_t> data;
     bool bool_value;
     int64_t number_value;
+    uint64_t number_value_unsigned;
     double number_value_float;
+    std::string string_value;
 } test_data_t;
 
 std::vector<test_data_t> extract_tests();
@@ -72,8 +74,12 @@ TEST_CASE("Test Vectors")
             }
             else if (reader->objects[0]->is_unsigned())
             {
-                REQUIRE(reader->objects[0]->as_uint64() == t.number_value);
+                REQUIRE(reader->objects[0]->as_uint64() == t.number_value_unsigned);
             }
+            break;
+        case DataTypeString:
+            reader = new MsgPack(t.data);
+            REQUIRE(reader->objects[0]->as_string() == t.string_value);
             break;
         default:
             break;
@@ -132,7 +138,6 @@ std::vector<test_data_t> extract_tests()
     buffer << t.rdbuf();
     std::string test_vectors_json = buffer.str();
 
-    parser parser;
     flatjson::fjson json(test_vectors_json.c_str(), test_vectors_json.c_str() + test_vectors_json.size());
 
     assert(json.is_valid());
@@ -167,11 +172,13 @@ std::vector<test_data_t> extract_tests()
             DataType type = DataTypeNull;
             bool bool_value = false;
             int64_t number_value = -123456;
+            uint64_t number_value_unsigned = 123456;
             double number_value_float = 0.12345;
+            std::string string_value = "foobarbaz";
 
             for (++oit; oit != oend; ++oit)
             {
-                //   std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
+                //std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
 
                 if (oit->key() == "ext")
                 {
@@ -184,11 +191,16 @@ std::vector<test_data_t> extract_tests()
                 else if (oit->key() == "string")
                 {
                     type = DataTypeString;
+                    char str_buffer[128 * 1024];
+                    std::stringstream ss(oit->value().data());
+                    ss.get((char *)&str_buffer, oit->value().size() + 1);
+                    string_value = str_buffer;
                 }
                 else if (oit->key() == "number")
                 {
                     type = DataTypeNumber;
-                    number_value = std::strtoul(oit->value().data(), nullptr, 10);
+                    number_value = std::strtol(oit->value().data(), nullptr, 10);
+                    number_value_unsigned = std::strtoul(oit->value().data(), nullptr, 10);
                     number_value_float = std::strtod(oit->value().data(), nullptr);
                     // std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
                 }
@@ -229,7 +241,7 @@ std::vector<test_data_t> extract_tests()
                     auto arrayjson_end = arrayjson.end();
                     for (++arrayjson_element; arrayjson_element != arrayjson_end; ++arrayjson_element)
                     {
-                        //std::cout << "  " << arrayjson_element->type_name() << " -> " << arrayjson_element->value() << std::endl;
+                        // std::cout << "  " << arrayjson_element->type_name() << " -> " << arrayjson_element->value() << std::endl;
 
                         // For some reason this ss includes all remaining data in the array
                         std::stringstream ss(arrayjson_element->value().data());
@@ -249,7 +261,7 @@ std::vector<test_data_t> extract_tests()
                             bytes.push_back(std::strtoul(tmp.c_str(), nullptr, 16));
                         }
 
-                        tests.push_back({name, type, bytes, bool_value, number_value, number_value_float});
+                        tests.push_back({name, type, bytes, bool_value, number_value, number_value_unsigned, number_value_float, string_value});
                     }
                 }
                 else if (oit->key() == "bignum")
