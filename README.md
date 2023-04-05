@@ -63,6 +63,7 @@ int main(void)
 
     return 0;
 }
+```
 
 Generates the output:
 
@@ -75,6 +76,4 @@ Record:
 Record: 
   Name: Fred
   Location: work
-```
-
 ```
