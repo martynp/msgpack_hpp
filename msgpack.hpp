@@ -157,7 +157,15 @@ public:
 
         throw "That went wrong";
     }
-    
+
+    std::vector<std::shared_ptr<MsgPackObj>> as_vector() {
+        if (type == MsgpackType::ARRAY)
+        {
+            return m_array;
+        }
+        throw "That went wrong";
+    }
+
     void to_raw(std::vector<char> &buffer);
 
     MsgpackType type;
@@ -175,7 +183,7 @@ public:
     int32_t m_int32;
     int64_t m_int64;
     std::string m_str;
-    std::vector<MsgPackObj> m_array;
+    std::vector<std::shared_ptr<MsgPackObj>> m_array;
     std::unordered_map<std::string, std::shared_ptr<MsgPackObj>> m_map_string;
 
     MsgPackObj()
@@ -282,6 +290,12 @@ public:
         {
             m_map_string[n.first] = n.second;
         }
+    }
+
+    MsgPackObj(std::vector<std::shared_ptr<MsgPackObj>> value)
+    {
+        type = MsgpackType::ARRAY;
+        m_array = value;
     }
 
     ~MsgPackObj()
@@ -783,6 +797,35 @@ public:
 
                 objects.push_back(std::make_shared<MsgPackObj>(pairs));
                 current += 1 + consumed + used;
+            }
+
+            else if ((raw[current] & 0xF0) == 0x90 || raw[current] == 0xdc || raw[current] == 0xdd) // FIXARR, ARR16, ARR32
+            {
+
+                // TODO, when reading out sizes we need to check the raw array is long enough
+                size_t used = 0;
+                uint32_t elements;
+                if (raw[current] == 0xdc)
+                {
+                    elements = raw[current + 1] << 8 | raw[current + 2];
+                    used = 2;
+                }
+                else if (raw[current] == 0xdd)
+                {
+                    elements = raw[current + 1] << 24 | raw[current + 2] << 16 | raw[current + 3] << 8 | raw[current + 4];
+                    used = 4;
+                }
+                else
+                {
+                    elements = raw[current] & 0x0F;
+                    used = 0;
+                }
+                std::vector<std::shared_ptr<MsgPackObj>> array;
+
+                MsgPack *array_elements = new MsgPack(std::vector<unsigned char>(raw.begin() + current + used + 1 + consumed, raw.end()), elements);
+
+                objects.push_back(std::make_shared<MsgPackObj>(array_elements->objects));
+                current += 1 + array_elements->consumed + used;
             }
             else if (raw[current] >= 0xe0 || raw[current] <= 0xff) // NEGATIVE FIXINT
             {

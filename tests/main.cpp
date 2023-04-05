@@ -156,6 +156,20 @@ TEST_CASE("Complex Maps")
 
 }
 
+TEST_CASE("Arrays")
+{
+    std::vector<uint8_t> msg = {
+        0x92, 0x00, 0x01, 
+    };
+    auto *reader = new MsgPack(msg);
+
+    REQUIRE(reader->objects[0]->type == MsgpackType::ARRAY);
+    auto array = reader->objects[0]->as_vector();
+    REQUIRE(array[0]->as_int32() == 0);
+    REQUIRE(array[1]->as_int32() == 1);
+
+}
+
 uint8_t from_hex(std::string str)
 {
     uint8_t x;
