@@ -157,6 +157,7 @@ public:
 
         throw "That went wrong";
     }
+    
     void to_raw(std::vector<char> &buffer);
 
     MsgpackType type;
@@ -736,20 +737,39 @@ public:
                 objects.push_back(std::make_shared<MsgPackObj>(value));
                 current += 5 + size;
             }
-            else if ((raw[current] & 0xF0) == 0x80) // FIXMAP
+            else if ((raw[current] & 0xF0) == 0x80 || raw[current] == 0xde || raw[current] == 0xdf) // FIXMAP, MAP16, MAP32
             {
-                uint8_t elements = raw[current] & 0x0F;
+
+                // TODO, when reading out sizes we need to check the raw array is long enough
+                size_t used = 0;
+                uint32_t elements;
+                if (raw[current] == 0xde)
+                {
+                    elements = raw[current + 1] << 8 | raw[current + 2];
+                    used = 2;
+                }
+                else if (raw[current] == 0xdf)
+                {
+                    elements = raw[current + 1] << 24 | raw[current + 2] << 16 | raw[current + 3] << 8 | raw[current + 4];
+                    used = 4;
+                }
+                else
+                {
+                    elements = raw[current] & 0x0F;
+                    used = 0;
+                }
                 std::unordered_map<std::string, std::shared_ptr<MsgPackObj>> pairs;
                 size_t consumed = 0;
 
                 // Get string:object pair
-                for (int object_index = 0; object_index < elements; object_index++)
+                for (uint32_t object_index = 0; object_index < elements; object_index++)
                 {
                     // Get a pair from the vector
-                    MsgPack *pair = new MsgPack(std::vector<unsigned char>(raw.begin() + current + 1 + consumed, raw.end()), 2);
+                    MsgPack *pair = new MsgPack(std::vector<unsigned char>(raw.begin() + current + used + 1 + consumed, raw.end()), 2);
 
                     if (pair->objects.size() != 2)
                     {
+                        // TODO: Error handling
                         std::cout << "Expected 2" << std::endl;
                     }
 
@@ -762,7 +782,7 @@ public:
                 }
 
                 objects.push_back(std::make_shared<MsgPackObj>(pairs));
-                current += 1 + consumed;
+                current += 1 + consumed + used;
             }
             else if (raw[current] >= 0xe0 || raw[current] <= 0xff) // NEGATIVE FIXINT
             {

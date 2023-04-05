@@ -28,6 +28,7 @@ typedef struct
     DataType type;
     std::vector<uint8_t> data;
     bool bool_value;
+    uint32_t map_length;
     int64_t number_value;
     uint64_t number_value_unsigned;
     double number_value_float;
@@ -58,6 +59,14 @@ TEST_CASE("Test Vectors")
             reader = new MsgPack(t.data);
             REQUIRE(reader->objects[0]->m_bool == t.bool_value);
             break;
+        case DataTypeMap:
+            reader = new MsgPack(t.data);
+            // TODO Map tests are recursive, need to refactor the map YML decoder in order to run these tests correctly
+            for (auto e : reader->objects)
+            {
+                REQUIRE(e->is_map() == true);
+            }
+            break;
         case DataTypeNumber:
             reader = new MsgPack(t.data);
             if (reader->objects[0]->is_float32())
@@ -81,6 +90,7 @@ TEST_CASE("Test Vectors")
             reader = new MsgPack(t.data);
             REQUIRE(reader->objects[0]->as_string() == t.string_value);
             break;
+
         default:
             break;
         }
@@ -114,6 +124,35 @@ TEST_CASE("Test Zero Types")
     REQUIRE(reader->objects[8]->type == MsgpackType::INT64);
     REQUIRE(reader->objects[9]->type == MsgpackType::FLOAT32);
     REQUIRE(reader->objects[10]->type == MsgpackType::FLOAT64);
+}
+
+TEST_CASE("Complex Maps")
+{
+    /*
+    {
+        "a": 1,
+        "b": 2,
+        "c": {
+            "ca": "abc"
+        }
+    }
+    */
+
+    std::vector<uint8_t> msg = {
+        0xde, 0x00, 0x03, // Map of 3 elements
+        0xa1, 0x61, 0x01, // Element 1
+        0xa1, 0x62, 0x02, // Element 2
+        0xa1, 0x63, 0xdf, 0x00, 0x00, 0x00, 0x01, 0xa2, 0x63, 0x61, 0xa3, 0x61, 0x62, 0x63 // Element 3 (Map)
+    };
+    auto *reader = new MsgPack(msg);
+
+    REQUIRE(reader->objects[0]->type == MsgpackType::MAP);
+    auto map = reader->objects[0]->as_str_map();
+    REQUIRE(map["a"]->as_int32() == 1);
+    REQUIRE(map["b"]->as_int32() == 2);
+    REQUIRE(map["c"]->is_map());
+    auto sub_map = map["c"]->as_str_map();
+    REQUIRE(sub_map["ca"]->as_string() == "abc");
 }
 
 uint8_t from_hex(std::string str)
@@ -171,6 +210,7 @@ std::vector<test_data_t> extract_tests()
 
             DataType type = DataTypeNull;
             bool bool_value = false;
+            uint32_t map_size = 10000;
             int64_t number_value = -123456;
             uint64_t number_value_unsigned = 123456;
             double number_value_float = 0.12345;
@@ -178,7 +218,7 @@ std::vector<test_data_t> extract_tests()
 
             for (++oit; oit != oend; ++oit)
             {
-                //std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
+                // std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
 
                 if (oit->key() == "ext")
                 {
@@ -215,6 +255,19 @@ std::vector<test_data_t> extract_tests()
                 else if (oit->key() == "map")
                 {
                     type = DataTypeMap;
+
+                    /*
+                    std::cout << "      " << oit->key() << ":" << oit->type_name() << " -> " << oit->value() << std::endl;
+
+                    auto mapjson = json.at(oit);
+                    auto mit = mapjson.begin();
+                    auto mend = mapjson.end();
+
+                    for (++mit; mit != mend; ++mit)
+                    {
+                        std::cout << "            " << mit->key() << ":" << mit->type_name() << " -> " << mit->value() << std::endl;
+                    }
+                    */
                 }
                 else if (oit->key() == "bool")
                 {
@@ -261,7 +314,7 @@ std::vector<test_data_t> extract_tests()
                             bytes.push_back(std::strtoul(tmp.c_str(), nullptr, 16));
                         }
 
-                        tests.push_back({name, type, bytes, bool_value, number_value, number_value_unsigned, number_value_float, string_value});
+                        tests.push_back({name, type, bytes, bool_value, map_size, number_value, number_value_unsigned, number_value_float, string_value});
                     }
                 }
                 else if (oit->key() == "bignum")
