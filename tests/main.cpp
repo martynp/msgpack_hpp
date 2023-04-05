@@ -153,6 +153,7 @@ TEST_CASE("Complex Maps")
     REQUIRE(map["c"]->is_map());
     auto sub_map = map["c"]->as_str_map();
     REQUIRE(sub_map["ca"]->as_string() == "abc");
+
 }
 
 uint8_t from_hex(std::string str)
