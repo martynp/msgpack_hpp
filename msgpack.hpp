@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 
+#include <sstream>
 #include <iostream>
 
 typedef enum e_MsgpackType
@@ -158,7 +159,8 @@ public:
         throw "That went wrong";
     }
 
-    std::vector<std::shared_ptr<MsgPackObj>> as_vector() {
+    std::vector<std::shared_ptr<MsgPackObj>> as_vector()
+    {
         if (type == MsgpackType::ARRAY)
         {
             return m_array;
@@ -309,76 +311,87 @@ public:
         }
     }
 
-    void print(bool new_line = true)
+    std::stringstream to_string(bool new_line = true)
     {
+        std::stringstream ret;
+
         switch (type)
         {
         case MsgpackType::POSITIVE_FIXINT:
-            std::cout << "POSITIVE_FIXINT(" << (uint16_t)m_int8 << ")";
+            ret << "POSITIVE_FIXINT(" << (uint16_t)m_int8 << ")";
             break;
         case MsgpackType::INT8:
-            std::cout << "INT8(" << (uint16_t)m_int8 << ")";
+            ret << "INT8(" << (uint16_t)m_int8 << ")";
             break;
         case MsgpackType::INT16:
-            std::cout << "INT16(" << m_int16 << ")";
+            ret << "INT16(" << m_int16 << ")";
             break;
         case MsgpackType::INT32:
-            std::cout << "INT32(" << m_int32 << ")";
+            ret << "INT32(" << m_int32 << ")";
             break;
         case MsgpackType::INT64:
-            std::cout << "INT64(" << m_int64 << ")";
+            ret << "INT64(" << m_int64 << ")";
             break;
         case MsgpackType::UINT8:
-            std::cout << "UINT8(" << (uint16_t)m_uint8 << ")";
+            ret << "UINT8(" << (uint16_t)m_uint8 << ")";
             break;
         case MsgpackType::UINT16:
-            std::cout << "UINT16(" << m_uint16 << ")";
+            ret << "UINT16(" << m_uint16 << ")";
             break;
         case MsgpackType::UINT32:
-            std::cout << "UINT32(" << m_uint32 << ")";
+            ret << "UINT32(" << m_uint32 << ")";
             break;
         case MsgpackType::UINT64:
-            std::cout << "UINT64(" << m_uint64 << ")";
+            ret << "UINT64(" << m_uint64 << ")";
             break;
         case MsgpackType::FLOAT32:
-            std::cout << "FLOAT32(" << m_float32 << ")";
+            ret << "FLOAT32(" << m_float32 << ")";
             break;
         case MsgpackType::FLOAT64:
-            std::cout << "FLOAT64(" << m_float64 << ")";
+            ret << "FLOAT64(" << m_float64 << ")";
             break;
         case MsgpackType::BIN:
-            std::cout << "BIN(";
+            ret << "BIN(";
             for (const auto &n : *m_bin)
             {
-                std::cout << "0x" << std::hex << (int)n << std::dec << ",";
+                ret << "0x" << std::hex << (int)n << std::dec << ",";
             }
 
-            std::cout << ")";
+            ret << ")";
             break;
         case MsgpackType::STR:
-            std::cout << "STR(" << m_str << ")";
+            ret << "STR(" << m_str << ")";
             break;
         case MsgpackType::MAP:
-            std::cout << "MAP(";
+            ret << "MAP(";
             for (const auto &n : m_map_string)
             {
-                std::cout << n.first << " : ";
-                n.second->print(false);
-                std::cout << ", ";
+                ret << n.first << " : ";
+                n.second->to_string(false);
+                ret << ", ";
             }
-            std::cout << ")";
+            ret << ")";
             break;
         default:
-            std::cout << "??" << type;
+            ret << "??" << type;
             break;
         }
 
         if (new_line)
         {
-            std::cout << std::endl;
+            ret << std::endl;
         }
+
+        return ret;
     }
-};
+
+    void print(bool new_line = true)
+    {
+        std::cout << to_string(new_line).str();
+    }
+
+}
+;
 
 class MsgPack
 {
@@ -438,7 +451,6 @@ public:
                 {
                     // Exception
                 }
-                std::cout << (int)size << std::endl;
                 std::shared_ptr<std::vector<unsigned char>> value = std::make_shared<std::vector<unsigned char>>();
                 value->reserve(size);
                 for (int ind = 0; ind < size; ind++)
