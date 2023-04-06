@@ -50,7 +50,7 @@ int main(void)
     std::cout << std::endl;
 
 
-    auto records = map["records"]->as_str_map();
+    auto records = map["records"]->as_vector();
     for (auto &r : records)
     {
         std::cout << "Record: " << std::endl;
