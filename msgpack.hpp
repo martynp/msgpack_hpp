@@ -405,6 +405,10 @@ public:
     MsgPack(std::vector<unsigned char> raw, int limit = -1)
     {
 
+        if (limit > 0) {
+            objects.reserve(limit);
+        } 
+
         char num = 1;
         if (*(char *)&num == 1)
         {
@@ -786,29 +790,21 @@ public:
                 }
                 std::unordered_map<std::string, std::shared_ptr<MsgPackObj>> pairs;
                 size_t consumed = 0;
+                
+                MsgPack *o = new MsgPack(std::vector<unsigned char>(raw.begin() + current + used + 1 + consumed, raw.end()), elements*2);
 
-                // Get string:object pair
-                for (uint32_t object_index = 0; object_index < elements; object_index++)
-                {
-                    // Get a pair from the vector
-                    MsgPack *pair = new MsgPack(std::vector<unsigned char>(raw.begin() + current + used + 1 + consumed, raw.end()), 2);
+                if (o->objects.size() % 2 > 0) {
+                    throw "expected an even number of objects";
+                }
 
-                    if (pair->objects.size() != 2)
-                    {
-                        // TODO: Error handling
-                        std::cout << "Expected 2" << std::endl;
-                    }
-
-                    std::shared_ptr<MsgPackObj> value = pair->objects[1];
-                    pairs[pair->objects[0]->as_string()] = value;
-
-                    consumed += pair->consumed; // Keep track of how many bytes from the input buffer we have used
-
-                    delete pair;
+                for (uint32_t i = 0; i < elements*2; i+=2) {
+                    pairs[o->objects[i]->as_string()] = o->objects[i+1];
                 }
 
                 objects.push_back(std::make_shared<MsgPackObj>(pairs));
-                current += 1 + consumed + used;
+                current += 1 + o->consumed + used;
+
+                delete o;
             }
 
             else if ((raw[current] & 0xF0) == 0x90 || raw[current] == 0xdc || raw[current] == 0xdd) // FIXARR, ARR16, ARR32
