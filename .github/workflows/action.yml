@@ -12,4 +12,4 @@ jobs:
       steps:
       - uses: actions/checkout@v2
       - name: run test
-      run: cd ./tests/ && g++ -O3 main.cpp -o main && ./main
+        run: cd ./tests/ && g++ -O3 main.cpp -o main && ./main
