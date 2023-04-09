@@ -389,9 +389,7 @@ public:
     {
         std::cout << to_string(new_line).str();
     }
-
-}
-;
+};
 
 class MsgPack
 {
@@ -405,9 +403,10 @@ public:
     MsgPack(std::vector<unsigned char> raw, int limit = -1)
     {
 
-        if (limit > 0) {
+        if (limit > 0)
+        {
             objects.reserve(limit);
-        } 
+        }
 
         char num = 1;
         if (*(char *)&num == 1)
@@ -637,7 +636,6 @@ public:
             }
             else if (raw[current] == 0xd2) // INT32
             {
-
                 check_size(current, 4, raw.size());
 
                 int32_t value;
@@ -695,10 +693,8 @@ public:
             {
 
                 uint8_t size = raw[current] & 0x1F;
-                if (current + size >= raw.size())
-                {
-                    // Exception
-                }
+                check_size(current, size, raw.size());
+
                 std::string value;
                 value.reserve(size);
 
@@ -709,16 +705,12 @@ public:
             }
             else if (raw[current] == 0xd9) // STR8
             {
-                if (current + 1 >= raw.size())
-                {
-                    // Exception
-                }
+
+                check_size(current, 1, raw.size());
                 uint8_t size = (uint8_t)raw[current + 1];
 
-                if (current + 1 + size >= raw.size())
-                {
-                    // Exception
-                }
+                check_size(current, 1 + size, raw.size());
+
                 std::string value;
                 value.reserve(size);
 
@@ -729,16 +721,12 @@ public:
             }
             else if (raw[current] == 0xda) // STR16
             {
-                if (current + 2 >= raw.size())
-                {
-                    // Exception
-                }
+
+                check_size(current, 2, raw.size());
                 uint16_t size = (((uint16_t)raw[current + 1]) << 8) | (uint16_t)raw[current + 2];
 
-                if (current + 2 + size >= raw.size())
-                {
-                    // Exception
-                }
+                check_size(current, 2 + size, raw.size());
+
                 std::string value;
                 value.reserve(size);
 
@@ -749,16 +737,12 @@ public:
             }
             else if (raw[current] == 0xdb) // STR32
             {
-                if (current + 4 >= raw.size())
-                {
-                    // Exception
-                }
+
+                check_size(current, 4, raw.size());
                 uint32_t size = (((uint32_t)raw[current + 1]) << 24) | (((uint32_t)raw[current + 2]) << 16) | (((uint32_t)raw[current + 3]) << 8) | (uint32_t)raw[current + 4];
 
-                if (current + 4 + size >= raw.size())
-                {
-                    // Exception
-                }
+                check_size(current, 4 + size, raw.size());
+                
                 std::string value;
                 value.reserve(size);
 
@@ -770,35 +754,43 @@ public:
             else if ((raw[current] & 0xF0) == 0x80 || raw[current] == 0xde || raw[current] == 0xdf) // FIXMAP, MAP16, MAP32
             {
 
-                // TODO, when reading out sizes we need to check the raw array is long enough
                 size_t used = 0;
                 uint32_t elements;
                 if (raw[current] == 0xde)
                 {
+                    // Check that first byte of the rest of the message is good
+                    check_size(current, 2+1, raw.size());
                     elements = raw[current + 1] << 8 | raw[current + 2];
                     used = 2;
                 }
                 else if (raw[current] == 0xdf)
                 {
+                    // Check that first byte of the rest of the message is good
+                    check_size(current, 4+1, raw.size());
                     elements = raw[current + 1] << 24 | raw[current + 2] << 16 | raw[current + 3] << 8 | raw[current + 4];
                     used = 4;
                 }
                 else
                 {
+                    // Check that first byte of the rest of the message is good
+                    check_size(current, 0+1, raw.size()); 
                     elements = raw[current] & 0x0F;
                     used = 0;
                 }
+
                 std::unordered_map<std::string, std::shared_ptr<MsgPackObj>> pairs;
                 size_t consumed = 0;
-                
-                MsgPack *o = new MsgPack(std::vector<unsigned char>(raw.begin() + current + used + 1 + consumed, raw.end()), elements*2);
 
-                if (o->objects.size() % 2 > 0) {
+                MsgPack *o = new MsgPack(std::vector<unsigned char>(raw.begin() + current + used + 1 + consumed, raw.end()), elements * 2);
+
+                if (o->objects.size() % 2 > 0)
+                {
                     throw "expected an even number of objects";
                 }
 
-                for (uint32_t i = 0; i < elements*2; i+=2) {
-                    pairs[o->objects[i]->as_string()] = o->objects[i+1];
+                for (uint32_t i = 0; i < elements * 2; i += 2)
+                {
+                    pairs[o->objects[i]->as_string()] = o->objects[i + 1];
                 }
 
                 objects.push_back(std::make_shared<MsgPackObj>(pairs));
@@ -815,16 +807,22 @@ public:
                 uint32_t elements;
                 if (raw[current] == 0xdc)
                 {
+                    // Check that first byte of the rest of the message is good
+                    check_size(current, 2+1, raw.size());
                     elements = raw[current + 1] << 8 | raw[current + 2];
                     used = 2;
                 }
                 else if (raw[current] == 0xdd)
                 {
+                    // Check that first byte of the rest of the message is good
+                    check_size(current, 4+1, raw.size());
                     elements = raw[current + 1] << 24 | raw[current + 2] << 16 | raw[current + 3] << 8 | raw[current + 4];
                     used = 4;
                 }
                 else
                 {
+                    // Check that first byte of the rest of the message is good
+                    check_size(current, 0+1, raw.size());
                     elements = raw[current] & 0x0F;
                     used = 0;
                 }
@@ -852,12 +850,6 @@ public:
 
         consumed = current;
 
-        /*
-        for (size_t i = 0; i < objects.size(); i++)
-        {
-            objects[i]->print(true);
-        }
-        */
     }
 
     ~MsgPack()
